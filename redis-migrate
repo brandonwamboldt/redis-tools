@@ -1,0 +1,58 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Usage:
+ *
+ *   ./redis-migrate OLD_HOST NEW_HOST ["KEY_PATTERN"]
+ *
+ * Example:
+ *
+ *   ./redis-migrate localhost redis.example.com "namespace:*"
+ *
+ * Options:
+ *
+ *   --quiet  Don't show every key that gets migrated
+ *
+ * @author Brandon Wamboldt <brandon.wamboldt@gmail.com>
+ */
+
+if (isset($argv[3])) {
+  $keys = $argv[3];
+} else {
+  $keys = '*';
+}
+
+// Establish connection to the redis instance we are migrating from
+$redisOld = new Redis();
+$redisOld->connect($argv[1]);
+$oldKeys = $redisOld->keys($keys);
+
+// Establish connection to the redis instance we are migrating to
+$redisNew = new Redis();
+$redisNew->connect($argv[2]);
+$newKeys = $redisNew->keys($keys);
+
+// Only migrate keys if they don't already exist
+$migrated = 0;
+
+foreach ($oldKeys as $key) {
+  if ($key == 'ElastiCacheMasterReplicationTimestamp' || in_array($key, $newKeys)) {
+    continue;
+  }
+
+  // Get needed info about the old key
+  $dump = $redisOld->dump($key);
+  $ttl  = $redisOld->ttl($key);
+  $ttl  = $ttl == -1 ? 0 : $ttl;
+
+  if (!in_array('--quiet', $argv) && !in_array('-q', $argv)) {
+    echo 'Migrating key: ' . $key . " (TTL: {$ttl})\n";
+  }
+
+  // Import to the new redis instance
+  $redisNew->restore($key, $ttl, $dump);
+  $migrated++;
+}
+
+echo 'Successfully migrated ' . $migrated . " keys\n";

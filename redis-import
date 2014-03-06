@@ -1,0 +1,43 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Usage:
+ *
+ *   redis-import HOST OUTPUT_FILE
+ *
+ * Example:
+ *
+ *   redis-import localhost localhost.dump
+ *
+ * Options:
+ *
+ *   --quiet  Don't show every key that gets imported
+ *
+ * @author Brandon Wamboldt <brandon.wamboldt@gmail.com>
+ */
+ 
+
+if (!extension_loaded('redis')) {
+  echo "The Redis extension is not installed or not enabled.\n\n";
+  echo "You can install the Redis extension using PECL:\n\n";
+  echo "    pecl install redis\n\n";
+  echo "Exiting...\n";
+  exit(1);
+}
+
+// Establish connection to the redis instance we are migrating from
+$dumped = 0;
+$redis  = new Redis();
+$redis->connect($argv[1]);
+$data = unserialize(file_get_contents($argv[2]));
+ 
+foreach ($data as $key => $info) {
+  $dump = $redis->restore($key, $info[1], $info[0]);
+ 
+  if (!in_array('--quiet', $argv) && !in_array('-q', $argv)) {
+    echo 'Importing key: ' . $key . " (TTL: {$info[1]})\n";
+  }
+}
+
+echo 'Successfully imported ' . count($data) . " keys\n";
