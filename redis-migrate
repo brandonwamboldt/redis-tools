@@ -43,8 +43,12 @@ foreach ($oldKeys as $key) {
 
   // Get needed info about the old key
   $dump = $redisOld->dump($key);
-  $ttl  = $redisOld->ttl($key);
+  $ttl  = $redisOld->pttl($key);
   $ttl  = $ttl == -1 ? 0 : $ttl;
+  if ($ttl == -2) {
+    // Key expired already (Redis 2.8 only)
+    continue;
+  }
 
   if (!in_array('--quiet', $argv) && !in_array('-q', $argv)) {
     echo 'Migrating key: ' . $key . " (TTL: {$ttl})\n";
